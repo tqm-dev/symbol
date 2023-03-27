@@ -130,5 +130,14 @@ namespace catapult { namespace tools { namespace ssl {
 		auto fullCertificateChain = CreateFullCertificateChainPem(certificates);
 		SaveToFile(certificateDirectory, "node.key.pem", CreatePrivateKeyPem(nodeKeyPair));
 		SaveToFile(certificateDirectory, "node.full.crt.pem", fullCertificateChain);
+#if __USE_JNI__
+		if (ScenarioId::Two_Level_Certificate_Chain_With_Same_Key == scenarioId) {
+			std::vector<std::shared_ptr<x509_st>> nodeCert { certificates[0] };
+			std::vector<std::shared_ptr<x509_st>> caCert   { certificates[1] };
+			SaveToFile(certificateDirectory, "node.crt.pem" , CreateFullCertificateChainPem(nodeCert));
+			SaveToFile(certificateDirectory, "ca.crt.pem"   , CreateFullCertificateChainPem(caCert));
+			SaveToFile(certificateDirectory, "ca.pubkey.pem", CreatePublicKeyPem(caKeyPair));
+		}
+#endif
 	}
 }}}

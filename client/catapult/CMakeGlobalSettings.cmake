@@ -20,10 +20,14 @@ if(CCACHE_EXE)
 	endif(MSVC)
 endif(CCACHE_EXE)
 
+if(USE_JNI)
+	### Automatically set by NDK
+else()
 ### set general cmake settings
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+endif()
 
 ### set up conan
 if(USE_CONAN)
@@ -137,6 +141,8 @@ if(MSVC)
 	add_definitions(-D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
 	# boost asio associated_allocator
 	add_definitions(-D_SILENCE_CXX17_ALLOCATOR_VOID_DEPRECATION_WARNING)
+elseif(USE_JNI)
+	add_definitions(-D__USE_JNI__)
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
 	# -Wstrict-aliasing=1 perform most paranoid strict aliasing checks
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wformat-security -Werror -Wstrict-aliasing=1")
@@ -168,10 +174,14 @@ elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
 	set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -g1")
 endif()
 
+if(USE_JNI)
+	# not set visibility flags
+else()
 if(NOT MSVC)
 	# set visibility flags
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
+endif()
 endif()
 
 if(CATAPULT_BUILD_RELEASE)
@@ -371,8 +381,12 @@ endfunction()
 
 # combines catapult_library and catapult_target
 function(catapult_library_target TARGET_NAME)
+if(USE_JNI)
+	catapult_shared_library(${TARGET_NAME} ${ARGN})
+else()
 	catapult_library(${TARGET_NAME} ${ARGN})
 	set_property(TARGET ${TARGET_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
+endif()
 	catapult_target(${TARGET_NAME})
 endfunction()
 
@@ -472,7 +486,11 @@ endfunction()
 function(catapult_define_tool TOOL_NAME)
 	set(TARGET_NAME catapult.tools.${TOOL_NAME})
 
+if(USE_JNI)
+	catapult_shared_library(${TARGET_NAME})
+else()
 	catapult_executable(${TARGET_NAME})
+endif()
 	target_link_libraries(${TARGET_NAME} catapult.tools)
 	catapult_target(${TARGET_NAME})
 
@@ -480,3 +498,13 @@ function(catapult_define_tool TOOL_NAME)
 
 	install(TARGETS ${TARGET_NAME})
 endfunction()
+
+if(USE_JNI)
+# used to add pre-built shared libraries
+function(add_library_imported TARGET_NAME LIB_LOCATION)
+	add_library(${TARGET_NAME} SHARED IMPORTED)
+	set_target_properties(${TARGET_NAME} PROPERTIES IMPORTED_LOCATION ${LIB_LOCATION})
+	message("....imported ${TARGET_NAME} from ${LIB_LOCATION}")
+endfunction()
+endif()
+

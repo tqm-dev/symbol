@@ -25,6 +25,9 @@
 #include "catapult/types.h"
 #include <memory>
 #include <vector>
+#if __USE_JNI__
+#include "jni.h"
+#endif
 
 namespace catapult {
 	namespace cache { class CatapultCache; }
@@ -53,6 +56,13 @@ namespace catapult { namespace extensions {
 		/// Adds a service registrar (\a pServiceRegistrar).
 		void addServiceRegistrar(std::unique_ptr<ServiceRegistrar>&& pServiceRegistrar);
 
+#if __USE_JNI__
+		/// Registers a java virtual machine \a vm.
+		void setJavaVM(JavaVM *vm);
+		/// Registers a java object \a obj.
+		void setJavaObject(jobject obj);
+#endif
+
 	public:
 		/// Gets the system plugin names.
 		const std::vector<std::string>& systemPluginNames() const;
@@ -63,9 +73,20 @@ namespace catapult { namespace extensions {
 		/// Registers all services by forwarding \a locator and \a state.
 		void registerServices(ServiceLocator& locator, ServiceState& state);
 
+#if __USE_JNI__
+		/// Gets the java virtual machine.
+		JavaVM* javaVM(void);
+		/// Gets the java object.
+		jobject javaObject(void);
+#endif
+
 	private:
 		std::vector<std::string> m_systemPluginNames;
 		NetworkTimeSupplier m_networkTimeSupplier;
 		std::vector<std::unique_ptr<ServiceRegistrar>> m_serviceRegistrars;
+#if __USE_JNI__
+		JavaVM* m_vm;
+		jobject m_javaObject;
+#endif
 	};
 }}

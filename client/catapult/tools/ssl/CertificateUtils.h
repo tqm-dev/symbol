@@ -30,6 +30,10 @@ namespace catapult { namespace tools { namespace ssl {
 
 	// region key utils
 
+#if __USE_JNI__
+    /// Creates pem public key.
+    std::string CreatePublicKeyPem(const crypto::KeyPair& keyPair);
+#endif
 	/// Creates pem private key.
 	std::string CreatePrivateKeyPem(const crypto::KeyPair& keyPair);
 

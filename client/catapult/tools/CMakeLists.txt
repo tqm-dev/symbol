@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.14)
 
+if(USE_JNI)
+include_directories(. ../include)
+add_subdirectory(ssl)
+add_subdirectory(tools)
+else()
 include_directories(. ${CMAKE_BINARY_DIR}/inc)
 
 add_subdirectory(address)
@@ -15,3 +20,4 @@ add_subdirectory(testvectors)
 add_subdirectory(tools)
 add_subdirectory(verify)
 add_subdirectory(votingkey)
+endif()

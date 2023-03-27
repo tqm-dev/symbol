@@ -9,9 +9,16 @@ file(GLOB external_donna_SRC
 
 SOURCE_GROUP("donna" FILES ${external_donna_SRC})
 
+if(USE_JNI)
+add_library(external
+	SHARED
+	${external_donna_SRC}
+	README.txt) 
+else()
 add_library(external
 	${external_donna_SRC}
 	README.txt)
+endif()
 
 catapult_add_openssl_dependencies(external)
 

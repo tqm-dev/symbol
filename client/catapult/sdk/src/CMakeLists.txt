@@ -12,6 +12,9 @@ target_link_libraries(${TARGET_NAME}
 	catapult.plugins.namespace.sdk
 	catapult.plugins.restrictionaccount.sdk)
 
+if(USE_JNI)
+target_link_libraries(${TARGET_NAME} catapult.io catapult.ionet)
+else()
 find_program(PYTHON_EXECUTABLE python3 python)
 
 add_custom_command(
@@ -22,3 +25,4 @@ add_custom_command(
 add_custom_target(
 	publish
 	DEPENDS ${CMAKE_BINARY_DIR}/inc/catapult/catapult.h)
+endif()

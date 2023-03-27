@@ -1,10 +1,14 @@
 cmake_minimum_required(VERSION 3.14)
 project(catapult_server)
 option(ENABLE_CODE_COVERAGE "Enable code coverage" OFF)
+if(USE_JNI)
+option(ENABLE_TESTS "Enable tests" OFF)
+else()
 option(ENABLE_TESTS "Enable tests" ON)
 
 # ccache on windows requires real binary instead of the shims used by scoop to be in the path
 option(USE_CCACHE_ON_WINDOWS "Enable use ccache on Windows" OFF)
+endif()
 
 include(CMakeGlobalSettings.cmake)
 
@@ -33,8 +37,32 @@ endfunction()
 
 ### setup boost
 message("--- locating boost dependencies ---")
+if(USE_JNI)
+set(Boost_INCLUDE_DIR ${CATAPULT_DEPS_DIR}/boost/include)
+include_directories(SYSTEM ${Boost_INCLUDE_DIR})
+add_library_imported(boost_atomic          ${CATAPULT_DEPS_DIR}/boost/lib/libboost_atomic.so)
+add_library_imported(boost_chrono          ${CATAPULT_DEPS_DIR}/boost/lib/libboost_chrono.so)
+add_library_imported(boost_filesystem      ${CATAPULT_DEPS_DIR}/boost/lib/libboost_filesystem.so)
+add_library_imported(boost_regex           ${CATAPULT_DEPS_DIR}/boost/lib/libboost_regex.so)
+add_library_imported(boost_thread          ${CATAPULT_DEPS_DIR}/boost/lib/libboost_thread.so)
+add_library_imported(boost_log             ${CATAPULT_DEPS_DIR}/boost/lib/libboost_log.so)
+add_library_imported(boost_log_setup       ${CATAPULT_DEPS_DIR}/boost/lib/libboost_log_setup.so)
+add_library_imported(boost_date_time       ${CATAPULT_DEPS_DIR}/boost/lib/libboost_date_time.so)
+add_library_imported(boost_program_options ${CATAPULT_DEPS_DIR}/boost/lib/libboost_program_options.so)
+set(Boost_VERSION "1.80")
+set(Boost_LIBRARIES	boost_atomic
+					boost_chrono
+					boost_filesystem
+					boost_regex
+					boost_thread
+					boost_log
+					boost_log_setup
+					boost_date_time
+					boost_program_options)
+else()
 find_package(Boost 1.80.0 EXACT COMPONENTS ${CATAPULT_BOOST_COMPONENTS} REQUIRED)
 include_directories(SYSTEM ${Boost_INCLUDE_DIR})
+endif()
 
 message("boost     ver: ${Boost_VERSION}")
 message("boost     inc: ${Boost_INCLUDE_DIR}")
@@ -54,8 +82,17 @@ endif()
 ### setup openssl
 message("--- locating openssl dependencies ---")
 
+if(USE_JNI)
+set(OPENSSL_VERSION "3.0.7")
+set(OPENSSL_ROOT_DIR "${CATAPULT_DEPS_DIR}/openssl")
+add_library_imported(openssl_ssl    ${OPENSSL_ROOT_DIR}/lib/libssl.so)
+add_library_imported(openssl_crypto ${OPENSSL_ROOT_DIR}/lib/libcrypto.so)
+set(OPENSSL_INCLUDE_DIR             ${OPENSSL_ROOT_DIR}/include)
+set(OPENSSL_LIBRARIES openssl_ssl openssl_crypto)
+else()
 find_package(OpenSSL 3.0.7 EXACT REQUIRED)
 message("OpenSSL   ver: ${OPENSSL_VERSION}")
+endif()
 message("OpenSSL  root: ${OPENSSL_ROOT_DIR}")
 message("OpenSSL   inc: ${OPENSSL_INCLUDE_DIR}")
 message("OpenSSL  libs: ${OPENSSL_LIBRARIES}")
@@ -63,11 +100,26 @@ message("OpenSSL  libs: ${OPENSSL_LIBRARIES}")
 # used to add openssl dependencies to a target
 function(catapult_add_openssl_dependencies TARGET_NAME)
 	include_directories(${OPENSSL_INCLUDE_DIR})
+if(USE_JNI)
+	target_link_libraries(${TARGET_NAME} ${OPENSSL_LIBRARIES})
+else()
 	target_link_libraries(${TARGET_NAME} OpenSSL::SSL)
+endif()
 endfunction()
 
 ### setup rocksdb
 message("--- locating rocksdb dependencies ---")
+if(USE_JNI)
+set(RocksDB_VERSION "7.7.3")
+set(RocksDB_INCLUDE_DIRS ${CATAPULT_DEPS_DIR}/rocksdb/include)
+set(RocksDB_LIBRARY_PATH ${CATAPULT_DEPS_DIR}/rocksdb/lib)
+add_library_imported(librocksdb ${RocksDB_LIBRARY_PATH}/librocksdb.so)
+set(RocksDB_LIBRARY librocksdb)
+message("rocksdb   ver: ${RocksDB_VERSION}")
+message("rocksdb   inc: ${RocksDB_INCLUDE_DIRS}")
+message("rocksdb   lib: ${RocksDB_LIBRARY_PATH}")
+include_directories(SYSTEM ${RocksDB_INCLUDE_DIRS})
+else()
 find_package(RocksDB 7.7.3 EXACT REQUIRED)
 
 if(WIN32)
@@ -81,6 +133,7 @@ get_property(RocksDB_INCLUDE_DIRS TARGET ${RocksDB_LIBRARY} PROPERTY INTERFACE_I
 message("rocksdb   inc: ${RocksDB_INCLUDE_DIRS}")
 get_library_path("RocksDB_LIBRARY_PATH" ${RocksDB_LIBRARY})
 message("rocksdb   lib: ${RocksDB_LIBRARY_PATH}")
+endif()
 
 # used to add rocksdb dependencies to a target
 function(catapult_add_rocksdb_dependencies TARGET_NAME)
@@ -99,7 +152,11 @@ add_subdirectory(external)
 
 # run catapult tests first
 add_subdirectory(src)
+if(USE_JNI)
+# Exclude building tests and tools
+else()
 catapult_add_tests_subdirectory(tests)
+endif()
 
 # run other tests second
 add_subdirectory(sdk)

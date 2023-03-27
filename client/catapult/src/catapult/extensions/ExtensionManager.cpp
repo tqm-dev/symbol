@@ -43,6 +43,15 @@ namespace catapult { namespace extensions {
 		m_serviceRegistrars.push_back(std::move(pServiceRegistrar));
 	}
 
+#if __USE_JNI__
+	void ExtensionManager::setJavaVM(JavaVM *vm) {
+		m_vm = vm;
+	}
+	void ExtensionManager::setJavaObject(jobject obj) {
+		m_javaObject = obj;
+	}
+#endif
+
 	const std::vector<std::string>& ExtensionManager::systemPluginNames() const {
 		return m_systemPluginNames;
 	}
@@ -50,6 +59,15 @@ namespace catapult { namespace extensions {
 	ExtensionManager::NetworkTimeSupplier ExtensionManager::networkTimeSupplier(const utils::TimeSpan& epochAdjustment) const {
 		return m_networkTimeSupplier ? m_networkTimeSupplier : [epochAdjustment]() { return utils::NetworkTime(epochAdjustment).now(); };
 	}
+
+#if __USE_JNI__
+	JavaVM* ExtensionManager::javaVM() {
+		return m_vm;
+	}
+	jobject ExtensionManager::javaObject() {
+		return m_javaObject;
+	}
+#endif
 
 	void ExtensionManager::registerServices(ServiceLocator& locator, ServiceState& state) {
 		// sort the registrars based on their annnounced phases

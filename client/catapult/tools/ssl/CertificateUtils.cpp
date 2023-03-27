@@ -91,6 +91,16 @@ namespace catapult { namespace tools { namespace ssl {
 		};
 	}
 
+#if __USE_JNI__
+	std::string CreatePublicKeyPem(const crypto::KeyPair& keyPair) {
+		BioWrapper bio;
+		auto pKey = GenerateCertificatePublicKey(keyPair.publicKey());
+		if (!PEM_write_bio_PUBKEY(bio, pKey.get()))
+			CATAPULT_THROW_RUNTIME_ERROR("error writing public key to bio");
+
+		return bio.toString();
+	}
+#endif
 	std::string CreatePrivateKeyPem(const crypto::KeyPair& keyPair) {
 		BioWrapper bio;
 		auto pKey = GenerateCertificateKey(keyPair);
