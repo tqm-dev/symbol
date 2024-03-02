@@ -5,13 +5,30 @@ The changelog format is based on [Keep a Changelog](https://keepachangelog.com/e
 
 ## next
 
-## [3.0.4] - 12-Dec-2022
+## [3.1.0] - 04-Aug-2023
+
+### Changed
+ - bump minimum python requirement to 3.9
+ - bump version of ripemd-hash dependency to allow windows compilation
+
+## [3.0.11] - 27-Jul-2023
+
+### Added
+ - lookup_transaction_name for generating friendly transaction name from transaction type and version
+ - (Symbol-only) special handling for encrypted messages created by Symbol wallets
+
+### Fixed
+ - (NEM-only) rename TransactionType enum value MULTISIG_TRANSACTION to MULTISIG
+ - (Symbol-only) error that occurs when setting MosaicFlags in the Mosaic definition transaction
+
+## [3.0.7] - 27-Apr-2023
 
 ### Changed
  - Network
    - to_datetime and from_datetime promoted from NetworkTimestamp to Network
    - NetworkTimestamp moved into Network
    - Add epoch_time to network description
+   - Adjust testnet epoch time to match sai network
  - MerkleHashBuilder.py renamed to Merkle.py
  - Facade
    - Can be created around Network instance or name
@@ -35,6 +52,9 @@ The changelog format is based on [Keep a Changelog](https://keepachangelog.com/e
    - Utility function metadata_update_value for simplifying update of metadata values
  - Proper handling of catbuffer computed fields/properties
  - (NEM-only) Automatic population for fields levy_size and message_envelope_size
+
+### Fixed
+ - (NEM-only) Add NonVerifiableMultisigTransactionV1 model required for signing 'multisig_transaction_v1'
 
 ## [3.0.3] - 14-Mar-2022
 
@@ -74,16 +94,17 @@ The changelog format is based on [Keep a Changelog](https://keepachangelog.com/e
 ### Fixed
  - add mapping for voting key dto
 
-## [1.0.0] - 22-Apr-2021
+## 1.0.0 - 22-Apr-2021
 
 ### Added
  - initial code release
 
-[3.0.4]: https://github.com/symbol/sdk-python/compare/v3.0.3...v3.0.4
-[3.0.3]: https://github.com/symbol/sdk-python/compare/v3.0.2...v3.0.3
-[3.0.2]: https://github.com/symbol/sdk-python/compare/v3.0.1...v3.0.2
-[3.0.1]: https://github.com/symbol/sdk-python/compare/v3.0.0...v3.0.1
-[3.0.0]: https://github.com/symbol/sdk-python/compare/v2.0.0...v3.0.0
-[2.0.0]: https://github.com/symbol/sdk-python/compare/v1.0.3...v2.0.0
-[1.0.3]: https://github.com/symbol/sdk-python/compare/v1.0.0...v1.0.3
-[1.0.0]: https://github.com/symbol/sdk-python/releases/tag/v1.0.0
+[3.1.0]: https://github.com/symbol/symbol/compare/sdk%2Fpython%2Fv3.0.11...sdk%2Fpython%2Fv3.1.0
+[3.0.11]: https://github.com/symbol/symbol/compare/sdk%2Fpython%2Fv3.0.7...sdk%2Fpython%2Fv3.0.11
+[3.0.7]: https://github.com/symbol/symbol/compare/sdk%2Fpython%2Fv3.0.3...sdk%2Fpython%2Fv3.0.7
+[3.0.3]: https://github.com/symbol/symbol/compare/sdk%2Fpython%2Fv3.0.2...sdk%2Fpython%2Fv3.0.3
+[3.0.2]: https://github.com/symbol/symbol/compare/sdk%2Fpython%2Fv3.0.1...sdk%2Fpython%2Fv3.0.2
+[3.0.1]: https://github.com/symbol/symbol/compare/sdk%2Fpython%2Fv3.0.0...sdk%2Fpython%2Fv3.0.1
+[3.0.0]: https://github.com/symbol/symbol/compare/sdk%2Fpython%2Fv2.0.0...sdk%2Fpython%2Fv3.0.0
+[2.0.0]: https://github.com/symbol/symbol/compare/sdk%2Fpython%2Fv1.0.3...sdk%2Fpython%2Fv2.0.0
+[1.0.3]: https://github.com/symbol/symbol/releases/tag/sdk%2Fpython%2Fv1.0.3

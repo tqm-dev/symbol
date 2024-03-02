@@ -17,7 +17,7 @@ if(CCACHE_EXE)
 	else()
 		set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
 		set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
-	endif(MSVC)
+	endif()
 endif(CCACHE_EXE)
 
 if(USE_JNI)
@@ -44,6 +44,12 @@ endif()
 ### set boost settings
 add_definitions(-DBOOST_ALL_DYN_LINK)
 add_definitions(-DBOOST_ASIO_USE_TS_EXECUTOR_AS_DEFAULT)
+
+if(Boost_VERSION VERSION_LESS 1.84)
+	# workaround for https://github.com/boostorg/phoenix/issues/111
+	add_definitions(-DBOOST_PHOENIX_STL_TUPLE_H_)
+endif()
+
 set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
@@ -76,8 +82,8 @@ endif()
 ### set code coverage
 if(ENABLE_CODE_COVERAGE)
 	if("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
-		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage -fprofile-arcs -ftest-coverage")
-		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage -fprofile-arcs -ftest-coverage")
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage -fprofile-arcs -ftest-coverage -fprofile-update=atomic")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage -fprofile-arcs -ftest-coverage -fprofile-update=atomic")
 	elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
 		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-instr-generate -fcoverage-mapping")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-instr-generate -fcoverage-mapping")
@@ -92,8 +98,8 @@ if(ENABLE_FUZZ_BUILD)
 endif()
 
 if(USE_SANITIZER)
-	set(SANITIZER_BLACKLIST "${PROJECT_SOURCE_DIR}/sanitizer_blacklist.txt")
-	set(SANITIZATION_FLAGS "-fno-omit-frame-pointer -fsanitize-blacklist=${SANITIZER_BLACKLIST} -fsanitize=${USE_SANITIZER}")
+	set(SANITIZER_IGNORELIST "${PROJECT_SOURCE_DIR}/sanitizer_ignorelist.txt")
+	set(SANITIZATION_FLAGS "-fno-omit-frame-pointer -fsanitize-ignorelist=${SANITIZER_IGNORELIST} -fsanitize=${USE_SANITIZER}")
 
 	if(USE_SANITIZER MATCHES "undefined")
 		set(SANITIZATION_FLAGS "${SANITIZATION_FLAGS} -fsanitize=implicit-conversion,nullability")
@@ -160,6 +166,8 @@ elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
 	# - Wno-padded: allow compiler to automatically pad data types for alignment
 	# - Wno-switch-enum: do not require enum switch statements to list every value (this setting is also incompatible with GCC warnings)
 	# - Wno-weak-vtables: vtables are emitted in all translation units for virtual classes with no out-of-line virtual method definitions
+	# - Wno-unsafe-buffer-usage: allow unsafe buffer usage https://reviews.llvm.org/D137379
+	# = Wno-shadow-uncaptured-local: allow shadowing of local variables in lambdas https://github.com/llvm/llvm-project/issues/81307
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
 		-stdlib=libc++ \
 		-Weverything \
@@ -169,7 +177,9 @@ elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
 		-Wno-disabled-macro-expansion \
 		-Wno-padded \
 		-Wno-switch-enum \
-		-Wno-weak-vtables")
+		-Wno-weak-vtables \
+		-Wno-unsafe-buffer-usage \
+		-Wno-shadow-uncaptured-local")
 
 	set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -g1")
 endif()
@@ -254,9 +264,16 @@ function(catapult_set_test_compiler_options)
 	# some gtest workarounds for gcc + clang
 	if("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
 		# - Wno-dangling-else: workaround for GTEST ambiguous else blocker not working https://github.com/google/googletest/issues/1119
-		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
-			-Wno-dangling-else"
-			PARENT_SCOPE)
+		# disable dangling reference for tests - https://gcc.gnu.org/bugzilla/show_bug.cgi?id=108165#c9
+		if("${CMAKE_CXX_COMPILER_VERSION}" MATCHES "^13.")
+			set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
+				-Wno-dangling-else -Wno-dangling-reference"
+				PARENT_SCOPE)
+		else()
+			set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
+				-Wno-dangling-else"
+				PARENT_SCOPE)
+		endif()
 	elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
 		# - Wno-global-constructors: required for GTEST test definition macros
 		# - Wno-zero-as-null-pointer-constant: workaround for GTEST NULL/nullptr mismatch https://github.com/google/googletest/issues/1323
@@ -447,8 +464,6 @@ endfunction()
 function(catapult_test_executable TARGET_NAME)
 	catapult_executable(${TARGET_NAME} ${ARGN})
 	add_test(NAME ${TARGET_NAME} WORKING_DIRECTORY ${CMAKE_BINARY_DIR} COMMAND ${TARGET_NAME})
-
-	target_link_libraries(${TARGET_NAME} ${GTEST_LIBRARIES})
 endfunction()
 
 # used to define a catapult test executable for a catapult library by combining catapult_test_executable and
@@ -465,13 +480,14 @@ function(catapult_test_executable_target TARGET_NAME TEST_DEPENDENCY_NAME)
 	MATH(EXPR TEST_END_INDEX "${TEST_END_INDEX}+1")
 	string(SUBSTRING ${TARGET_NAME} ${TEST_END_INDEX} -1 LIBRARY_UNDER_TEST)
 
-	target_link_libraries(${TARGET_NAME} tests.catapult.test.${TEST_DEPENDENCY_NAME} ${LIBRARY_UNDER_TEST} ${GTEST_LIBRARIES})
+	target_link_libraries(${TARGET_NAME} tests.catapult.test.${TEST_DEPENDENCY_NAME} ${LIBRARY_UNDER_TEST})
 	catapult_target(${TARGET_NAME})
 endfunction()
 
 # used to define a catapult test executable for a header only catapult library by combining catapult_test_executable and
 # catapult_target and adding some library dependencies
-function(catapult_test_executable_target_header_only TARGET_NAME TEST_DEPENDENCY_NAME)
+# also used when the library under test should not be automatically added because it's included by the test dependency library
+function(catapult_test_executable_target_no_lib TARGET_NAME TEST_DEPENDENCY_NAME)
 	catapult_test_executable(${TARGET_NAME} ${ARGN})
 
 	# customize and export compiler options for gtest

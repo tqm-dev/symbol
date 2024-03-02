@@ -1,11 +1,10 @@
 import argparse
 import copy
+import hashlib
 import importlib
 import json
 from binascii import hexlify
 from pathlib import Path
-
-import sha3
 
 from symbolchain import nc, sc
 from symbolchain.ByteArray import ByteArray
@@ -78,11 +77,11 @@ class SymbolHelper:
 	@staticmethod
 	def get_test_name(object_name, test_prefix, index):
 		name_mapping = {
-			'transaction': lambda test_prefix, index: f'{test_prefix}_single_{index+1}',
-			'aggregate': lambda test_prefix, index: f'{test_prefix}_aggregate_{index+1}',
-			'receipt': lambda test_prefix, index: f'{test_prefix}_{index+1}',
-			'block': lambda test_prefix, index: f'{test_prefix}_{index+1}',
-			'other': lambda test_prefix, index: f'{test_prefix}_other_{index+1}'
+			'transaction': lambda test_prefix, index: f'{test_prefix}_single_{index + 1}',
+			'aggregate': lambda test_prefix, index: f'{test_prefix}_aggregate_{index + 1}',
+			'receipt': lambda test_prefix, index: f'{test_prefix}_{index + 1}',
+			'block': lambda test_prefix, index: f'{test_prefix}_{index + 1}',
+			'other': lambda test_prefix, index: f'{test_prefix}_other_{index + 1}'
 		}
 
 		return name_mapping[object_name](test_prefix, index)
@@ -98,8 +97,8 @@ class SymbolHelper:
 		return handler_mapping[object_name]
 
 	def set_common_fields(self, descriptor, test_name):
-		descriptor['signer_public_key'] = sha3.sha3_256(test_name.encode('utf8')).hexdigest().upper()
-		descriptor['signature'] = self.Signature(sha3.sha3_512(test_name.encode('utf8')).hexdigest())
+		descriptor['signer_public_key'] = hashlib.sha3_256(test_name.encode('utf8')).hexdigest().upper()
+		descriptor['signature'] = self.Signature(hashlib.sha3_512(test_name.encode('utf8')).hexdigest())
 		descriptor['fee'] = 0xFEEFEEFEEFEEFEE0
 		descriptor['deadline'] = 0x71E71E71E71E71E0
 
@@ -116,10 +115,10 @@ class SymbolHelper:
 
 	@staticmethod
 	def create_cosignature_descriptor(test_name, index):
-		name = f'{test_name}_cosig_{index+1}'
+		name = f'{test_name}_cosig_{index + 1}'
 		return {
-			'signer_public_key': sha3.sha3_256(name.encode('utf8')).hexdigest(),
-			'signature': sha3.sha3_512(name.encode('utf8')).hexdigest()
+			'signer_public_key': hashlib.sha3_256(name.encode('utf8')).hexdigest(),
+			'signature': hashlib.sha3_512(name.encode('utf8')).hexdigest()
 		}
 
 	@staticmethod
@@ -165,8 +164,8 @@ class SymbolHelper:
 		printable_descriptor['transactions'] = transaction_descriptors
 
 		# boring fields
-		printable_descriptor['signature'] = self.Signature(sha3.sha3_512(test_name.encode('utf8')).hexdigest())
-		printable_descriptor['signer_public_key'] = sha3.sha3_256(test_name.encode('utf8')).hexdigest()
+		printable_descriptor['signature'] = self.Signature(hashlib.sha3_512(test_name.encode('utf8')).hexdigest())
+		printable_descriptor['signer_public_key'] = hashlib.sha3_256(test_name.encode('utf8')).hexdigest()
 		printable_descriptor['timestamp'] = 0x71E71E71E71E71E0
 
 		descriptor = copy.copy(printable_descriptor)
@@ -214,8 +213,8 @@ class NemHelper:
 	@staticmethod
 	def get_test_name(object_name, test_prefix, index):
 		name_mapping = {
-			'transaction': lambda test_prefix, index: f'{test_prefix}_single_{index+1}',
-			'aggregate': lambda test_prefix, index: f'{test_prefix}_aggregate_{index+1}'
+			'transaction': lambda test_prefix, index: f'{test_prefix}_single_{index + 1}',
+			'aggregate': lambda test_prefix, index: f'{test_prefix}_aggregate_{index + 1}'
 		}
 
 		return name_mapping[object_name](test_prefix, index)
@@ -228,8 +227,8 @@ class NemHelper:
 		return handler_mapping[object_name]
 
 	def set_common_fields(self, descriptor, test_name):
-		descriptor['signer_public_key'] = sha3.sha3_256(test_name.encode('utf8')).hexdigest().upper()
-		descriptor['signature'] = self.Signature(sha3.sha3_512(test_name.encode('utf8')).hexdigest())
+		descriptor['signer_public_key'] = hashlib.sha3_256(test_name.encode('utf8')).hexdigest().upper()
+		descriptor['signature'] = self.Signature(hashlib.sha3_512(test_name.encode('utf8')).hexdigest())
 		descriptor['fee'] = 0xFEEFEEFEEFEEFEE0
 		descriptor['timestamp'] = 0x71E71E70
 
@@ -261,10 +260,10 @@ class NemHelper:
 		return self.facade.transaction_factory.create(descriptor), printable_descriptor
 
 	def create_cosignature(self, test_name, index):
-		name = f'{test_name}_cosig_{index+1}'
+		name = f'{test_name}_cosig_{index + 1}'
 		descriptor = {
 			# note: `type: cosignature`` is not present, it's handled by TransactionDescriptorProcessor
-			'multisig_transaction_hash': sha3.sha3_256(test_name.encode('utf8')).hexdigest(),
+			'multisig_transaction_hash': hashlib.sha3_256(test_name.encode('utf8')).hexdigest(),
 			'multisig_account_address': 'TBT7GACQQLYXUFBSQCUHXXWQMSRDAJPACTNJ724W'
 		}
 		self.set_common_fields(descriptor, name)
@@ -341,7 +340,7 @@ class VectorGenerator:
 				continue
 
 			test_prefix = f'{recipe["schema_name"]}_{module_descriptor[0]}'
-			test_name = f'{test_prefix}_aggregate_{index+1}'
+			test_name = f'{test_prefix}_aggregate_{index + 1}'
 
 			handler = self.helper.create_aggregate_from_single
 			test_cases.append(self.create_entry(self.helper.AGGREGATE_SCHEMA_NAME, test_name, handler, recipe['descriptor']))

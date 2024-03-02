@@ -1,4 +1,5 @@
 import argparse
+import sys
 from pathlib import Path
 
 from configuration import load_compiler_configuration, load_versions_map
@@ -66,12 +67,13 @@ class OptionsManager:
 			self.linkflags = []
 			self.sanitizer = None
 
-	def __init__(self, compiler_configuration, operating_system, versions_filepath):
+	def __init__(self, compiler_configuration, operating_system, versions_filepath, ignore_architecture):
 		self.compiler = compiler_configuration.compiler
 		self.operating_system = operating_system
 		self.sanitizers = compiler_configuration.sanitizers
 		self.architecture = compiler_configuration.architecture
 		self.stl = compiler_configuration.stl
+		self.ignore_architecture = ignore_architecture
 
 		self.versions = load_versions_map(versions_filepath)
 
@@ -86,16 +88,22 @@ class OptionsManager:
 	@property
 	def base_image_name(self):
 		name_parts = [self.operating_system, self.compiler.c, str(self.compiler.version)]
+		if not self.ignore_architecture:
+			name_parts.append(self.architecture)
+
 		return f'symbolplatform/symbol-server-compiler:{"-".join(name_parts)}'
 
 	def layer_image_name(self, layer):
 		name_parts = [self.operating_system, self.compiler.c, str(self.compiler.version)]
 		if 'conan' != layer:
-			name_parts.extend(self.sanitizers + [self.architecture])
+			name_parts.extend(self.sanitizers)
 
 		tag = LAYER_TO_IMAGE_TAG_MAP[layer]
 		if tag:
 			name_parts.append(tag)
+
+		if not self.ignore_architecture:
+			name_parts.append(self.architecture)
 
 		return f'symbolplatform/symbol-server-build-base:{"-".join(name_parts)}'
 
@@ -134,15 +142,17 @@ class OptionsManager:
 		return []
 
 	def mongo_c(self):
-		descriptor = self.OptionsDescriptor()
+		descriptor = self._enable_thread_san_descriptor()
 		descriptor.options += ['-DOPENSSL_ROOT_DIR=/usr/catapult/deps']
 		descriptor.options += get_dependency_flags('mongodb_mongo-c-driver')
+
 		return self._cmake(descriptor)
 
 	def mongo_cxx(self):
-		descriptor = self.OptionsDescriptor()
+		descriptor = self._enable_thread_san_descriptor()
 		descriptor.options += ['-DOPENSSL_ROOT_DIR=/usr/catapult/deps']
 		descriptor.options += get_dependency_flags('mongodb_mongo-cxx-driver')
+		descriptor.options += [f'-DBUILD_VERSION={self.versions["mongodb_mongo-cxx-driver"][1:]}']
 
 		if self.is_msvc:
 			# For build without a C++17 polyfill
@@ -152,7 +162,7 @@ class OptionsManager:
 		return self._cmake(descriptor)
 
 	def libzmq(self):
-		descriptor = self._zmq_descriptor()
+		descriptor = self._enable_thread_san_descriptor()
 		descriptor.options += get_dependency_flags('zeromq_libzmq')
 
 		if self.is_clang:
@@ -163,11 +173,11 @@ class OptionsManager:
 		return self._cmake(descriptor)
 
 	def cppzmq(self):
-		descriptor = self._zmq_descriptor()
+		descriptor = self._enable_thread_san_descriptor()
 		descriptor.options += get_dependency_flags('zeromq_cppzmq')
 		return self._cmake(descriptor)
 
-	def _zmq_descriptor(self):
+	def _enable_thread_san_descriptor(self):
 		descriptor = self.OptionsDescriptor()
 		if 'thread' in self.sanitizers:
 			descriptor.sanitizer = 'thread'
@@ -205,6 +215,9 @@ class OptionsManager:
 
 	@property
 	def _arch_flag(self):
+		if 'arm64' == self.architecture:
+			return ''
+
 		return f'-march={self.architecture}'
 
 	@property
@@ -261,6 +274,8 @@ class UbuntuSystem:
 			'ninja-build',
 			'pkg-config',
 			'python3',
+			'python3-pip',
+			'python3-venv',
 			'python3-ply',
 			'xz-utils'
 		]
@@ -355,6 +370,8 @@ class LinuxSystemGenerator:
 		self.options = options
 
 	def generate_phase_os(self):
+		# for compiler ignore architecture since we dont have a westmere compiler
+		self.options.ignore_architecture = True
 		print_lines([
 			'FROM {BASE_IMAGE_NAME}',
 			'ARG DEBIAN_FRONTEND=noninteractive',
@@ -364,7 +381,9 @@ class LinuxSystemGenerator:
 		self.system.add_base_os_packages()
 
 		cmake_version = self.options.versions['cmake']
-		cmake_script = f'cmake-{cmake_version}-Linux-x86_64.sh'
+		cmake_platform = 'aarch64' if 'arm64' == self.options.architecture else 'x86_64'
+
+		cmake_script = f'cmake-{cmake_version}-Linux-{cmake_platform}.sh'
 		cmake_uri = f'https://github.com/Kitware/CMake/releases/download/v{cmake_version}'
 		print_line([
 			'curl -o {CMAKE_SCRIPT} -SL "{CMAKE_URI}/{CMAKE_SCRIPT}"',
@@ -372,6 +391,18 @@ class LinuxSystemGenerator:
 			'./{CMAKE_SCRIPT} --skip-license --prefix=/usr',
 			'rm -rf {CMAKE_SCRIPT}'
 		], CMAKE_SCRIPT=cmake_script, CMAKE_URI=cmake_uri)
+
+		# create a virtual python environment
+		print_lines([
+			# add ubuntu user (used by jenkins)
+			'RUN id -u "ubuntu" || useradd --uid 1000 -ms /bin/bash ubuntu',
+			'USER ubuntu',
+			'WORKDIR /home/ubuntu',
+			'ENV VIRTUAL_ENV=/home/ubuntu/venv',
+			'RUN python3 -m venv $VIRTUAL_ENV',
+			'ENV PATH="$VIRTUAL_ENV/bin:$PATH"',
+			'USER root'
+		])
 
 	def generate_phase_boost(self):
 		print(f'FROM {self.options.layer_image_name("os")}')
@@ -386,8 +417,8 @@ class LinuxSystemGenerator:
 		boost_version = self.options.versions['boost']
 
 		print_args = {
-			'BOOST_ARCHIVE': f'boost_1_{boost_version}_0',
-			'BOOST_URI': f'https://boostorg.jfrog.io/artifactory/main/release/1.{boost_version}.0/source',
+			'BOOST_ARCHIVE': f'boost_{boost_version.replace(".", "_")}',
+			'BOOST_URI': f'https://boostorg.jfrog.io/artifactory/main/release/{boost_version}/source',
 			'BOOTSTRAP_OPTIONS': ' '.join(self.options.bootstrap()),
 			'B2_OPTIONS': ' '.join(self.options.b2()),
 			'BOOST_DISABLED_LIBS': ' '.join(BOOST_DISABLED_LIBS)
@@ -420,14 +451,14 @@ class LinuxSystemGenerator:
 	@staticmethod
 	def add_openssl(options, configure):
 		version = options.versions['openssl_openssl']
-		compiler = 'linux-x86_64-clang' if options.is_clang else 'linux-x86_64'
+		compiler = 'linux-aarch64' if 'arm64' == options.architecture else 'linux-x86_64-clang' if options.is_clang else 'linux-x86_64'
 		openssl_destinations = [f'--{key}=/usr/catapult/deps' for key in ('prefix', 'openssldir', 'libdir')]
 		print_line([
 			'RUN git clone https://github.com/openssl/openssl.git -b {VERSION}',
 			'cd openssl',
 			'{OPENSSL_OPTIONS} perl ./Configure {COMPILER} {OPENSSL_CONFIGURE} {OPENSSL_DESTINATIONS}',
 			'make -j 8',
-			'make install',
+			'make install_sw install_ssldirs',
 			'cd ..',
 			'rm -rf openssl'
 		],
@@ -472,7 +503,7 @@ class LinuxSystemGenerator:
 		print_line([
 			'RUN apt-get -y update',
 			'apt-get install -y {APT_PACKAGES}',
-			'python3 -m pip install -U "conan<2.0"',
+			'python3 -m pip install -U "conan<2.0"'
 		], APT_PACKAGES=' '.join(apt_packages))
 
 
@@ -497,8 +528,8 @@ class WindowsSystemGenerator:
 
 		boost_version = self.options.versions['boost']
 		print_args = {
-			'BOOST_ARCHIVE': f'boost_1_{boost_version}_0',
-			'BOOST_URI': f'https://boostorg.jfrog.io/artifactory/main/release/1.{boost_version}.0/source',
+			'BOOST_ARCHIVE': f'boost_{boost_version.replace(".", "_")}',
+			'BOOST_URI': f'https://boostorg.jfrog.io/artifactory/main/release/{boost_version}/source',
 			'BOOTSTRAP_OPTIONS': ' '.join(self.options.bootstrap()),
 			'B2_OPTIONS': ' '.join(self.options.b2()),
 			'BOOST_DISABLED_LIBS': ' '.join(BOOST_DISABLED_LIBS),
@@ -606,10 +637,11 @@ def main():
 	parser.add_argument('--versions', help='locked versions file', required=True)
 	parser.add_argument('--name-only', help='true to output layer name', action='store_true')
 	parser.add_argument('--base-name-only', help='true to output base name', action='store_true')
+	parser.add_argument('--ignore-architecture', help='ignore architecture for image name', action='store_true')
 	args = parser.parse_args()
 
 	compiler_configuration = load_compiler_configuration(args.compiler_configuration)
-	options_manager = OptionsManager(compiler_configuration, args.operating_system, args.versions)
+	options_manager = OptionsManager(compiler_configuration, args.operating_system, args.versions, args.ignore_architecture)
 
 	if args.base_name_only:
 		print(options_manager.base_image_name)
@@ -618,6 +650,10 @@ def main():
 	if args.name_only:
 		print(options_manager.layer_image_name(args.layer))
 		return
+
+	if args.ignore_architecture:
+		print('error: ignore architecture can only be used with name-only or base-name-only')
+		sys.exit(1)
 
 	system_generator_type = WindowsSystemGenerator if 'windows' == args.operating_system else LinuxSystemGenerator
 	dockerfile_generator = system_generator_type(SYSTEMS[args.operating_system], options_manager)

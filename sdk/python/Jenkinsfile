@@ -1,6 +1,9 @@
 defaultCiPipeline {
-	platform = ['ubuntu']
-	ciBuildDockerfile = 'python.Dockerfile'
+	operatingSystem = ['ubuntu', 'windows']
+	instanceSize = 'medium'
+
+	environment = 'python'
+	otherEnvironments = ['python-ubuntu-base', 'python-ubuntu-latest', 'python-windows-lts']
 
 	packageId = 'sdk-python'
 
