@@ -100,6 +100,22 @@ namespace catapult { namespace tools { namespace ssl {
 
 		return bio.toString();
 	}
+	std::vector<std::string> GetValidityFromPem(const std::string& pemFilePath) {
+		BIO* bioPem = BIO_new_file(pemFilePath.c_str(), "r");
+		X509* certificate = PEM_read_bio_X509(bioPem, nullptr, nullptr, nullptr);
+		if (!bioPem || !certificate) {
+			return {};
+		}
+		BioWrapper bioPrintStartTime;
+		BioWrapper bioPrintEndTime;
+		if (ASN1_TIME_print(bioPrintStartTime, X509_getm_notBefore(certificate)) == 0
+		||  ASN1_TIME_print(bioPrintEndTime, X509_getm_notAfter(certificate)) == 0
+		) {
+			return {};
+		}
+		BIO_free(bioPem);
+		return { bioPrintStartTime.toString(), bioPrintEndTime.toString() };
+	}
 #endif
 	std::string CreatePrivateKeyPem(const crypto::KeyPair& keyPair) {
 		BioWrapper bio;

@@ -33,6 +33,8 @@ namespace catapult { namespace tools { namespace ssl {
 #if __USE_JNI__
     /// Creates pem public key.
     std::string CreatePublicKeyPem(const crypto::KeyPair& keyPair);
+    /// Get validity from pem.
+	std::vector<std::string> GetValidityFromPem(const std::string& pemFilePath);
 #endif
 	/// Creates pem private key.
 	std::string CreatePrivateKeyPem(const crypto::KeyPair& keyPair);
