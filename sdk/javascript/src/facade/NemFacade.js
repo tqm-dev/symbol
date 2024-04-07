@@ -12,7 +12,13 @@ import {
 } from '../CryptoTypes.js';
 import { NetworkLocator } from '../Network.js';
 import { KeyPair, Verifier } from '../nem/KeyPair.js';
-import { Address, Network as NemNetwork } from '../nem/Network.js';
+import {
+	Address,
+	Network,
+	/* eslint-disable no-unused-vars */
+	NetworkTimestamp
+	/* eslint-enable no-unused-vars */
+} from '../nem/Network.js';
 import { deriveSharedKey } from '../nem/SharedKey.js';
 import TransactionFactory from '../nem/TransactionFactory.js';
 /* eslint-disable no-unused-vars */
@@ -58,20 +64,36 @@ export default class NemFacade {
 
 	/**
 	 * Creates a NEM facade.
-	 * @param {string|NemNetwork} network NEM network or network name.
+	 * @param {string|Network} network NEM network or network name.
 	 */
 	constructor(network) {
 		/**
 		 * Underlying network.
-		 * @type NemNetwork
+		 * @type {Network}
 		 */
-		this.network = 'string' === typeof network ? NetworkLocator.findByName(NemNetwork.NETWORKS, network) : network;
+		this.network = 'string' === typeof network ? NetworkLocator.findByName(Network.NETWORKS, network) : network;
 
 		/**
 		 * Underlying transaction factory.
-		 * @type TransactionFactory
+		 * @type {TransactionFactory}
 		 */
 		this.transactionFactory = new TransactionFactory(this.network);
+	}
+
+	/**
+	 * Gets class type.
+	 * @returns {typeof NemFacade} Class type.
+	 */
+	get static() { // eslint-disable-line class-methods-use-this
+		return NemFacade;
+	}
+
+	/**
+	 * Creates a network timestamp representing the current time.
+	 * @returns {NetworkTimestamp} Network timestamp representing the current time
+	 */
+	now() {
+		return this.network.fromDatetime(new Date());
 	}
 
 	// the following three functions are NOT static in order for NemFacade and SymbolFacade to conform to the same interface
@@ -110,7 +132,6 @@ export default class NemFacade {
 
 	/**
 	 * Creates a network compatible BIP32 path for the specified account.
-	 *
 	 * @param {number} accountId Id of the account for which to generate a BIP32 path.
 	 * @returns {Array<number>} BIP32 path for the specified account.
 	 */

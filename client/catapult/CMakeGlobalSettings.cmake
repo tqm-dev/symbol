@@ -32,13 +32,6 @@ endif()
 ### set up conan
 if(USE_CONAN)
 	set(CONAN_SYSTEM_INCLUDES ON)
-	include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-
-	if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-		conan_basic_setup(KEEP_RPATHS)
-	else()
-		conan_basic_setup()
-	endif()
 endif()
 
 ### set boost settings
@@ -201,7 +194,7 @@ endif()
 if("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
 	# set hardening flags
 	if(ENABLE_HARDENING)
-		set(HARDENING_FLAGS "-fstack-protector-all -D_FORTIFY_SOURCE=2")
+		set(HARDENING_FLAGS "-fstack-protector-all -D_FORTIFY_SOURCE=3")
 		if("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
 			set(HARDENING_FLAGS "${HARDENING_FLAGS} -fstack-clash-protection")
 		else()

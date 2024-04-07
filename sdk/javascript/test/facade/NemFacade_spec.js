@@ -15,6 +15,14 @@ describe('NEM Facade', () => {
 		expect(NemFacade.BIP32_CURVE_NAME).to.equal('ed25519-keccak');
 	});
 
+	it('has correct static accessor', () => {
+		// Arrange:
+		const facade = new NemFacade('testnet');
+
+		// Assert:
+		expect(NemFacade).to.deep.equal(facade.static);
+	});
+
 	it('has correct KeyPair', () => {
 		// Arrange:
 		const privateKey = new PrivateKey('ED4C70D78104EB11BCD73EBDC512FEBC8FBCEB36A370C957FF7E266230BB5D57'); // reversed
@@ -83,6 +91,30 @@ describe('NEM Facade', () => {
 
 		expect(transaction.type.value).to.equal(0x0101);
 		expect(transaction.version).to.equal(2);
+	});
+
+	// endregion
+
+	// region now
+
+	it('can create current timestamp for network via now', () => {
+		for (;;) {
+			// Arrange: affinitize test to run so that whole test runs within the context of the same millisecond
+			const startTime = new Date().getTime();
+			const facade = new NemFacade('testnet');
+
+			// Act:
+			const nowFromFacade = facade.now();
+			const nowFromNetwork = facade.network.fromDatetime(new Date(Date.now()));
+
+			const endTime = new Date().getTime();
+			if (startTime !== endTime)
+				continue; // eslint-disable-line no-continue
+
+			// Assert:
+			expect(nowFromFacade).to.deep.equal(nowFromNetwork);
+			break;
+		}
 	});
 
 	// endregion

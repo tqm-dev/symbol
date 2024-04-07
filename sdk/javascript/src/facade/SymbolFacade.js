@@ -12,7 +12,13 @@ import {
 } from '../CryptoTypes.js';
 import { NetworkLocator } from '../Network.js';
 import { KeyPair, Verifier } from '../symbol/KeyPair.js';
-import { Address, Network as SymbolNetwork } from '../symbol/Network.js';
+import {
+	Address,
+	Network,
+	/* eslint-disable no-unused-vars */
+	NetworkTimestamp
+	/* eslint-enable no-unused-vars */
+} from '../symbol/Network.js';
 import { deriveSharedKey } from '../symbol/SharedKey.js';
 import TransactionFactory from '../symbol/TransactionFactory.js';
 import { MerkleHashBuilder } from '../symbol/merkle.js';
@@ -88,20 +94,36 @@ export default class SymbolFacade {
 
 	/**
 	 * Creates a Symbol facade.
-	 * @param {string|SymbolNetwork} network Symbol network or network name.
+	 * @param {string|Network} network Symbol network or network name.
 	 */
 	constructor(network) {
 		/**
 		 * Underlying network.
-		 * @type SymbolNetwork
+		 * @type {Network}
 		 */
-		this.network = 'string' === typeof network ? NetworkLocator.findByName(SymbolNetwork.NETWORKS, network) : network;
+		this.network = 'string' === typeof network ? NetworkLocator.findByName(Network.NETWORKS, network) : network;
 
 		/**
 		 * Underlying transaction factory.
-		 * @type TransactionFactory
+		 * @type {TransactionFactory}
 		 */
 		this.transactionFactory = new TransactionFactory(this.network);
+	}
+
+	/**
+	 * Gets class type.
+	 * @returns {typeof SymbolFacade} Class type.
+	 */
+	get static() { // eslint-disable-line class-methods-use-this
+		return SymbolFacade;
+	}
+
+	/**
+	 * Creates a network timestamp representing the current time.
+	 * @returns {NetworkTimestamp} Network timestamp representing the current time
+	 */
+	now() {
+		return this.network.fromDatetime(new Date());
 	}
 
 	/**
@@ -190,7 +212,6 @@ export default class SymbolFacade {
 
 	/**
 	 * Creates a network compatible BIP32 path for the specified account.
-	 *
 	 * @param {number} accountId Id of the account for which to generate a BIP32 path.
 	 * @returns {Array<number>} BIP32 path for the specified account.
 	 */
